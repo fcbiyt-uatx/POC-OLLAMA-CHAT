@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Local PoC</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .box { border: 1px solid #e5e7eb; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .chat-window { height: 300px; overflow-y: auto; background: #f9fafb; border: 1px solid #e5e7eb; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .msg { margin-bottom: 10px; padding: 10px; border-radius: 6px; }
+        .user { background: #dbeafe; color: #1e40af; margin-left: 20%; }
+        .bot { background: #dcfce7; color: #166534; margin-right: 20%; }
+        input[type="text"], input[type="file"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #d1d5db; border-radius: 4px; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+        .btn-rag { background: #059669; }
+        .btn-rag:hover { background: #047857; }
+        .loading { display: none; font-size: 0.9em; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Servidor AI Local (PoC)</h2>
+        
+        <div class="box">
+            <h3>1. Cargar Documentos (RAG)</h3>
+            <input type="file" id="docFile" accept=".pdf,.txt,.md">
+            <button onclick="uploadDoc()">Subir e Indexar</button>
+            <span id="uploadStatus" class="loading">Procesando...</span>
+        </div>
+
+        <div class="box">
+            <h3>2. Chat</h3>
+            <div class="chat-window" id="chatWindow"></div>
+            <input type="text" id="userInput" placeholder="Escribe tu mensaje..." onkeypress="if(event.key === 'Enter') sendMsg('chat')">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="sendMsg('chat')">Hablar con LLM</button>
+                <button class="btn-rag" onclick="sendMsg('query')">Consultar Documentos (RAG)</button>
+                <span id="chatStatus" class="loading">Pensando...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadDoc() {
+            const fileInput = document.getElementById('docFile');
+            const status = document.getElementById('uploadStatus');
+            if (!fileInput.files[0]) return alert("Selecciona un archivo.");
+            
+            status.style.display = 'inline';
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                alert(data.message || data.error);
+            } catch (e) {
+                alert("Error de conexión");
+            } finally {
+                status.style.display = 'none';
+            }
+        }
+
+        async function sendMsg(mode) {
+            const input = document.getElementById('userInput');
+            const chatWindow = document.getElementById('chatWindow');
+            const status = document.getElementById('chatStatus');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            chatWindow.innerHTML += `<div class="msg user"><b>Tú:</b> ${msg}</div>`;
+            input.value = '';
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            status.style.display = 'inline';
+
+            const formData = new FormData();
+            formData.append("message", msg);
+            const endpoint = mode === 'chat' ? '/chat' : '/query';
+
+            try {
+                const res = await fetch(endpoint, { method: 'POST', body: formData });
+                const data = await res.json();
+                const reply = data.response || data.error;
+                chatWindow.innerHTML += `<div class="msg bot"><b>IA:</b> ${reply}</div>`;
+            } catch (e) {
+                chatWindow.innerHTML += `<div class="msg bot"><b>Error:</b> Servidor no responde.</div>`;
+            } finally {
+                status.style.display = 'none';
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>
